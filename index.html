@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>極致絲滑 算術數學貪食蛇 - Math Snake Pro</title>
+    <!-- 引入 Tailwind CSS 提供高品質現代 UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            touch-action: manipulation;
+            background-color: #0b0f19;
+        }
+        /* 避免在手機上點擊 D-pad 產生淡藍色高亮 */
+        -webkit-tap-highlight-color: transparent;
+        
+        /* 輕微呼吸燈特效 */
+        @keyframes pulse-light {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+        .pulse-element {
+            animation: pulse-light 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen text-slate-100 p-2 sm:p-4 overflow-x-hidden overflow-y-auto">
+
+<div class="w-full max-w-lg flex flex-col items-center gap-2 sm:gap-3 z-10 my-auto">
+    <!-- 遊戲標題與最高分 -->
+    <div class="w-full flex justify-between items-center px-2">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-wider bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
+                MATH SNAKE <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full ml-1 border border-emerald-500/30 font-bold">SILKY</span>
+            </h1>
+            <p class="text-[10px] sm:text-xs text-slate-400 tracking-widest font-bold">極致絲滑算術數學貪食蛇</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1 text-center backdrop-blur-md shadow-lg">
+                <span class="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">最高分數</span>
+                <span id="high-score" class="text-base sm:text-lg font-black text-amber-400">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頂部數學面板與當前分數 -->
+    <div class="w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-between relative overflow-hidden backdrop-blur-md shadow-xl">
+        <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500"></div>
+        <div class="w-full flex justify-between items-center mb-1">
+            <span class="text-[11px] sm:text-xs text-slate-400 font-semibold tracking-wider">
+                💡 <span class="text-emerald-400 font-bold">請吃掉正確的</span>答案食物！
+            </span>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1">
+                    <span class="text-[10px] sm:text-xs font-semibold text-cyan-400">SPEED:</span>
+                    <span id="current-speed" class="text-xs sm:text-sm font-bold text-cyan-400">1.0x</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-[10px] sm:text-xs font-semibold text-emerald-400">SCORE:</span>
+                    <span id="current-score" class="text-lg sm:text-xl font-black text-emerald-400">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 數學題目顯示區 -->
+        <div class="w-full py-2 sm:py-3 bg-slate-950/90 border border-slate-800/80 rounded-xl flex items-center justify-center relative my-1">
+            <span id="question-display" class="text-2xl sm:text-3.5xl font-black tracking-widest text-white drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                載入中...
+            </span>
+        </div>
+        <div class="w-full text-[10px] sm:text-xs text-slate-500 text-center mt-1">
+            🟢 答對：蛇身<span class="text-emerald-400 font-bold">縮短 1 節</span> | 🔴 答錯：蛇身<span class="text-rose-400 font-bold">增加 2 節</span> (並略微加速)
+        </div>
+    </div>
+
+    <!-- 遊戲畫布容器 -->
+    <div class="relative w-full aspect-square max-w-[430px] bg-[#070a13] border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <canvas id="game-canvas" class="w-full h-full block"></canvas>
+
+        <!-- 遊戲開始 / 遊戲結束 遮罩層 -->
+        <div id="overlay" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center transition-opacity duration-300">
+            <div id="welcome-state" class="flex flex-col items-center">
+                <div class="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-4 animate-bounce">
+                    <span class="text-3xl">🐍</span>
+                </div>
+                <h2 class="text-2xl font-black text-white tracking-wide mb-2">算術數學貪食蛇 PRO</h2>
+                <p class="text-xs sm:text-sm text-slate-400 max-w-sm mb-6 leading-relaxed">
+                    全新升級**極致流暢平滑物理**！<br>
+                    控制發光小蛇吃下正確答案食物！<br>
+                    答錯時，小蛇會痛苦地暴增長度與爬行速度喔！
+                </p>
+                <button id="start-btn" class="px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-black rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/30 active:scale-95 transition-all text-sm tracking-widest uppercase">
+                    開 始 遊 玩
+                </button>
+            </div>
+
+            <div id="gameover-state" class="hidden flex flex-col items-center">
+                <div class="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mb-4">
+                    <span class="text-3xl">💥</span>
+                </div>
+                <h2 class="text-2xl font-black text-rose-500 tracking-wide mb-1">發生衝撞！遊戲結束</h2>
+                <p class="text-xs text-slate-400 mb-4">快看看自己刷新歷史紀錄了沒！</p>
+                <div class="bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-xl mb-6 flex justify-around gap-6">
+                    <div class="text-center">
+                        <span class="block text-[10px] text-slate-500 font-bold uppercase">本次分數</span>
+                        <span id="final-score" class="text-xl font-black text-emerald-400">0</span>
+                    </div>
+                    <div class="text-center border-l border-slate-800 pl-6">
+                        <span class="block text-[10px] text-slate-500 font-bold uppercase">歷史最高</span>
+                        <span id="final-high-score" class="text-xl font-black text-amber-400">0</span>
+                    </div>
+                </div>
+                <button id="restart-btn" class="px-8 py-3 bg-gradient-to-r from-cyan-500 to-indigo-500 text-white font-black rounded-xl shadow-lg shadow-cyan-500/10 hover:shadow-cyan-500/30 active:scale-95 transition-all text-sm tracking-widest">
+                    再 戰 一 回
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 行動端虛擬搖桿 (D-pad) -->
+    <div class="w-full max-w-[260px] mt-1 mb-1">
+        <div class="grid grid-cols-3 gap-1.5 justify-center items-center">
+            <div></div>
+            <button id="ctrl-up" class="h-11 w-11 mx-auto flex items-center justify-center bg-slate-900 hover:bg-slate-800 border border-slate-800 active:scale-90 rounded-xl transition shadow-md touch-none">
+                <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
+            </button>
+            <div></div>
+
+            <button id="ctrl-left" class="h-11 w-11 mx-auto flex items-center justify-center bg-slate-900 hover:bg-slate-800 border border-slate-800 active:scale-90 rounded-xl transition shadow-md touch-none">
+                <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <div class="text-slate-600 text-[9px] text-center font-bold tracking-wider select-none">CONTROLS</div>
+            <button id="ctrl-right" class="h-11 w-11 mx-auto flex items-center justify-center bg-slate-900 hover:bg-slate-800 border border-slate-800 active:scale-90 rounded-xl transition shadow-md touch-none">
+                <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"/></svg>
+            </button>
+
+            <div></div>
+            <button id="ctrl-down" class="h-11 w-11 mx-auto flex items-center justify-center bg-slate-900 hover:bg-slate-800 border border-slate-800 active:scale-90 rounded-xl transition shadow-md touch-none">
+                <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div></div>
+        </div>
+    </div>
+</div>
+
+<!-- 頁尾聲明 -->
+<footer class="text-[9px] text-slate-600 mt-2 text-center">
+    鍵盤 WASD / 方向鍵 或 螢幕滑動 & 虛擬按鍵皆可控制 | 支援 Retina 高畫質渲染
+</footer>
+
+<script>
+// --- 音效系統 (利用 Web Audio API 合成，免加載外部任何音訊檔案) ---
+const AudioEngine = {
+    ctx: null,
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    },
+    playEatCorrect() {
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(1000, now + 0.15);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+    },
+    playEatWrong() {
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.linearRampToValueAtTime(70, now + 0.35);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.35);
+    },
+    playGameOver() {
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.linearRampToValueAtTime(30, now + 0.7);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.7);
+    },
+    playTick() {
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1500, now);
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.04);
+    }
+};
+
+// --- STREAMING_CHUNK: Initializing Game variables & High-DPI Canvas resolution... ---
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+
+const GRID_COUNT = 20; // 20x20 網格
+let cellSize = 0;
+
+// 解析度高畫質適應
+function setupCanvasResolution() {
+    const parent = canvas.parentElement;
+    const size = Math.min(parent.clientWidth, 430);
+    const dpr = window.devicePixelRatio || 1;
+    
+    // 設定實體像素大小 (防止模糊)
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    
+    // 設定 CSS 呈現大小
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+    
+    ctx.scale(dpr, dpr);
+    cellSize = size / GRID_COUNT;
+}
+setupCanvasResolution();
+window.addEventListener('resize', setupCanvasResolution);
+
+// 遊戲狀態變數
+let snake = [];       // 目前網格座標 [{x, y}]
+let prevSnake = [];   // 上一個網格座標 (用於平滑滑動插值) [{x, y}]
+let direction = { x: 1, y: 0 };
+let nextDirection = { x: 1, y: 0 };
+let foods = []; // 食物 [{x, y, value, isCorrect, colorHue}]
+let mathQuestion = { formula: "", answer: null };
+let score = 0;
+let highScore = parseInt(localStorage.getItem('math_snake_highscore_silky') || '0');
+let isGameOver = false;
+let isStarted = false;
+
+// 時間追蹤（控制物理 Tick 與繪圖循環）
+let lastUpdateTime = 0;
+let currentDelay = 240;      // 初始慢速：240ms，非常舒適，足夠玩家心算思考
+const START_DELAY = 240;
+const MIN_DELAY = 120;       // 最快限制在 120ms，保障反應空間
+const SPEED_PUNISHMENT = 15; // 答錯加速 15ms
+const SPEED_RECOVERY = 5;    // 答對減速回穩 5ms
+
+// 動態發光與微幅動畫所需的時間累加變數
+let globalAnimationTime = 0;
+
+document.getElementById('high-score').textContent = highScore;
+
+function updateSpeedUI() {
+    const multiplier = (START_DELAY / currentDelay).toFixed(1);
+    document.getElementById('current-speed').textContent = multiplier + 'x';
+}
+
+// --- STREAMING_CHUNK: Generating random math problem with perfect divisions... ---
+function generateQuestionAndChoices() {
+    const operations = ['+', '-', '*', '/'];
+    const op = operations[Math.floor(Math.random() * operations.length)];
+    let a, b, correctAnswer;
+
+    switch (op) {
+        case '+':
+            a = Math.floor(Math.random() * 25) + 5;
+            b = Math.floor(Math.random() * 25) + 5;
+            correctAnswer = a + b;
+            break;
+        case '-':
+            a = Math.floor(Math.random() * 40) + 10;
+            b = Math.floor(Math.random() * (a - 3)) + 2; // 保證正數
+            correctAnswer = a - b;
+            break;
+        case '*':
+            a = Math.floor(Math.random() * 8) + 2;
+            b = Math.floor(Math.random() * 9) + 2;
+            correctAnswer = a * b;
+            break;
+        case '/':
+            b = Math.floor(Math.random() * 8) + 2;
+            correctAnswer = Math.floor(Math.random() * 9) + 2;
+            a = b * correctAnswer; // 確保整除
+            break;
+    }
+
+    let displayOp = op;
+    if (op === '*') displayOp = '×';
+    if (op === '/') displayOp = '÷';
+
+    mathQuestion = {
+        formula: `${a} ${displayOp} ${b} = ?`,
+        answer: correctAnswer
+    };
+
+    const choices = [{ value: correctAnswer, isCorrect: true }];
+    while (choices.length < 3) {
+        const diff = (Math.random() < 0.5 ? -1 : 1) * (Math.floor(Math.random() * 6) + 1);
+        const wrongAnswer = correctAnswer + diff;
+        
+        if (wrongAnswer >= 0 && wrongAnswer !== correctAnswer && !choices.some(c => c.value === wrongAnswer)) {
+            choices.push({ value: wrongAnswer, isCorrect: false });
+        }
+    }
+
+    choices.sort(() => Math.random() - 0.5);
+    return choices;
+}
+
+// 確保食物不在蛇身上或已有的食物上
+function getRandomGridPosition() {
+    let position;
+    let attempts = 0;
+    while (attempts < 200) {
+        const x = Math.floor(Math.random() * GRID_COUNT);
+        const y = Math.floor(Math.random() * GRID_COUNT);
+        
+        const onSnake = snake.some(segment => segment.x === x && segment.y === y);
+        const onFood = foods.some(f => f.x === x && f.y === y);
+
+        if (!onSnake && !onFood) {
+            position = { x, y };
+            break;
+        }
+        attempts++;
+    }
+    if (!position) {
+        position = { x: 5, y: 5 };
+    }
+    return position;
+}
+
+function spawnFoods() {
+    const choices = generateQuestionAndChoices();
+    document.getElementById('question-display').textContent = mathQuestion.formula;
+
+    foods = [];
+    // 分配三個高飽和、高質感的亮色 Hue 值：0 = 橙橘紅, 120 = 翡翠綠 (通常是正確，這裡隨機混), 200 = 天空藍, 280 = 亮紫色
+    const hues = [25, 200, 280]; 
+    
+    choices.forEach((choice, index) => {
+        const pos = getRandomGridPosition();
+        foods.push({
+            x: pos.x,
+            y: pos.y,
+            value: choice.value,
+            isCorrect: choice.isCorrect,
+            hue: hues[index % hues.length]
+        });
+    });
+}
+
+function initGame() {
+    snake = [
+        { x: 10, y: 10 },
+        { x: 9, y: 10 },
+        { x: 8, y: 10 }
+    ];
+    // 初始化前一狀態 (使初始滑行不閃爍)
+    prevSnake = snake.map(s => ({ ...s }));
+    
+    direction = { x: 1, y: 0 };
+    nextDirection = { x: 1, y: 0 };
+    score = 0;
+    isGameOver = false;
+    currentDelay = START_DELAY;
+
+    document.getElementById('current-score').textContent = score;
+    updateSpeedUI();
+    spawnFoods();
+}
+
+// --- STREAMING_CHUNK: Updating physics on grid level... ---
+// 物理網格更新 tick
+function physicsTick() {
+    if (isGameOver) return;
+
+    // 將目前狀態存入 prevSnake
+    prevSnake = snake.map(s => ({ ...s }));
+
+    direction = nextDirection;
+    const head = snake[0];
+    const newHead = {
+        x: head.x + direction.x,
+        y: head.y + direction.y
+    };
+
+    // 碰撞邊界
+    if (newHead.x < 0 || newHead.x >= GRID_COUNT || newHead.y < 0 || newHead.y >= GRID_COUNT) {
+        endGame();
+        return;
+    }
+
+    // 碰撞身體 (排除可能正要移開的尾巴，但在插值下嚴格判定撞擊)
+    const hitSelf = snake.some((segment, idx) => {
+        if (idx === 0) return false;
+        return segment.x === newHead.x && segment.y === newHead.y;
+    });
+    if (hitSelf) {
+        endGame();
+        return;
+    }
+
+    // 將新頭部插入
+    snake.unshift(newHead);
+
+    // 檢查吃食
+    let foodEatenIndex = -1;
+    for (let i = 0; i < foods.length; i++) {
+        if (newHead.x === foods[i].x && newHead.y === foods[i].y) {
+            foodEatenIndex = i;
+            break;
+        }
+    }
+
+    if (foodEatenIndex !== -1) {
+        const eatenFood = foods[foodEatenIndex];
+        
+        if (eatenFood.isCorrect) {
+            score += 10;
+            document.getElementById('current-score').textContent = score;
+            AudioEngine.playEatCorrect();
+
+            // 答對獎勵：緩慢降速，穩健心算節奏
+            currentDelay = Math.min(START_DELAY, currentDelay + SPEED_RECOVERY);
+            updateSpeedUI();
+
+            // 核心創意：蛇身「縮短 1 節」 (因開頭 unshift 新增了1節，此時長度多1；再 pop 兩次就達到淨縮短 1 節)
+            if (snake.length > 2) {
+                snake.pop(); 
+                snake.pop(); 
+            } else {
+                snake.pop(); // 保持只有頭部
+            }
+        } else {
+            AudioEngine.playEatWrong();
+            
+            // 核心創意：蛇身「變長兩節」懲罰！ (因未 pop，且 unshift 多了1節。此處直接複製尾巴增加第 2 節)
+            const tail = snake[snake.length - 1];
+            snake.push({ ...tail });
+
+            // 答錯懲罰：爬行速度加快
+            currentDelay = Math.max(MIN_DELAY, currentDelay - SPEED_PUNISHMENT);
+            updateSpeedUI();
+        }
+
+        // 同步 prevSnake 的長度，避免在插值繪製時發生 length 陣列溢位
+        while (prevSnake.length < snake.length) {
+            prevSnake.push({ ...prevSnake[prevSnake.length - 1] });
+        }
+        while (prevSnake.length > snake.length) {
+            prevSnake.pop();
+        }
+
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('math_snake_highscore_silky', highScore);
+            document.getElementById('high-score').textContent = highScore;
+        }
+
+        spawnFoods();
+    } else {
+        // 沒有吃到任何東西，尾巴移除，保持原長度
+        snake.pop();
+    }
+}
+
+// --- STREAMING_CHUNK: High-performance rendering pipeline with animation frames... ---
+// 繪製與流暢插值主循環
+function gameLoop(timestamp) {
+    if (!lastUpdateTime) lastUpdateTime = timestamp;
+    
+    // 累加時間，使發光效果可以緩慢均勻呼吸
+    globalAnimationTime += 0.05;
+
+    // 計算自上一次物理更新後過了多久
+    let elapsed = timestamp - lastUpdateTime;
+    
+    // 如果時間到了，就進行一次物理Tick
+    if (elapsed >= currentDelay) {
+        physicsTick();
+        lastUpdateTime = timestamp;
+        elapsed = 0;
+    }
+
+    // 計算插值比例 t (0.0 ~ 1.0)
+    let t = elapsed / currentDelay;
+    if (t > 1) t = 1;
+    if (t < 0) t = 0;
+
+    // 如果遊戲結束，強制插值為 1 (停止滑行)
+    if (isGameOver) t = 1;
+
+    // 清理畫布
+    ctx.fillStyle = '#070a13';
+    ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+
+    // 繪製微弱暗色背景科技感網格
+    ctx.strokeStyle = '#12192c';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= GRID_COUNT; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(GRID_COUNT * cellSize, i * cellSize);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, GRID_COUNT * cellSize);
+        ctx.stroke();
+    }
+
+    // 1. 繪製 3 顆高對比度極致清晰發光食物
+    foods.forEach(food => {
+        const cx = food.x * cellSize + cellSize / 2;
+        const cy = food.y * cellSize + cellSize / 2;
+        
+        // 呼吸光暈效果
+        const pulse = Math.sin(globalAnimationTime + food.value) * 3 + 12;
+        const outerRadius = cellSize * 0.44;
+
+        ctx.save();
+        ctx.shadowBlur = pulse;
+        ctx.shadowColor = `hsl(${food.hue}, 95%, 55%)`;
+        
+        // 食物彩色亮邊圓圈
+        ctx.fillStyle = `hsl(${food.hue}, 95%, 50%)`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 食物核心：純白高對比實心圓
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerRadius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 清晰、粗體、高對比黑色數字
+        ctx.fillStyle = '#05070f';
+        ctx.font = `black ${Math.floor(cellSize * 0.65)}px 'Inter', sans-serif`;
+        ctx.fontWeight = '900';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(food.value, cx, cy);
+    });
+
+    // 2. 繪製極致美化、絲滑移動的蛇身
+    // 計算每節蛇身插值後在 Canvas 上的精確位置
+    const interpCoords = [];
+    for (let i = 0; i < snake.length; i++) {
+        const curr = snake[i];
+        const prev = prevSnake[i] || curr; // 防止溢位
+        
+        // 進行線性插值 (Lirp)
+        const ix = prev.x + (curr.x - prev.x) * t;
+        const iy = prev.y + (curr.y - prev.y) * t;
+        
+        interpCoords.push({ x: ix, y: iy });
+    }
+
+    // 由後往前繪製蛇身 (使蛇頭能覆蓋在脖子上方，效果更自然)
+    for (let i = interpCoords.length - 1; i >= 0; i--) {
+        const part = interpCoords[i];
+        const cx = part.x * cellSize + cellSize / 2;
+        const cy = part.y * cellSize + cellSize / 2;
+        
+        // 漸細係數：從頭部(最粗)到尾部(最細)
+        const ratio = i / Math.max(1, interpCoords.length - 1);
+        const radius = cellSize * (0.45 - ratio * 0.18); 
+
+        // 蛇身波動物理感：加入微幅的 slither 動態波形晃動
+        const waveOffset = Math.sin(globalAnimationTime * 1.5 - i * 0.5) * (ratio * 1.3);
+        // 根據移動方向，晃動應與移動方向垂直
+        let wx = cx;
+        let wy = cy;
+        if (direction.x !== 0) {
+            wy += waveOffset; // 左右橫移時，身體上下波動
+        } else {
+            wx += waveOffset; // 上下移動時，身體左右波動
+        }
+
+        ctx.save();
+        
+        if (i === 0) {
+            // 蛇頭：翡翠亮綠螢光發光
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = 'rgba(16, 185, 129, 0.7)';
+            
+            // 蛇頭漸層
+            const headGrad = ctx.createRadialGradient(wx, wy, 2, wx, wy, radius);
+            headGrad.addColorStop(0, '#34d399');
+            headGrad.addColorStop(1, '#059669');
+            ctx.fillStyle = headGrad;
+
+            ctx.beginPath();
+            ctx.arc(wx, wy, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 繪製靈動雙眼 (眼珠朝向移動方向)
+            ctx.fillStyle = '#ffffff';
+            const eyeSize = radius * 0.28;
+            let leftEye = { x: 0, y: 0 }, rightEye = { x: 0, y: 0 };
+            
+            // 眼睛方向微調 (根據即時插值與移動方向)
+            const angle = Math.atan2(direction.y, direction.x);
+            const eyeDist = radius * 0.45;
+            const eyeAngleOffset = 0.65; // 雙眼張角
+
+            leftEye.x = wx + Math.cos(angle - eyeAngleOffset) * eyeDist;
+            leftEye.y = wy + Math.sin(angle - eyeAngleOffset) * eyeDist;
+            rightEye.x = wx + Math.cos(angle + eyeAngleOffset) * eyeDist;
+            rightEye.y = wy + Math.sin(angle + eyeAngleOffset) * eyeDist;
+
+            ctx.beginPath();
+            ctx.arc(leftEye.x, leftEye.y, eyeSize, 0, Math.PI * 2);
+            ctx.arc(rightEye.x, rightEye.y, eyeSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 黑眼珠
+            ctx.fillStyle = '#000000';
+            const pupilSize = eyeSize * 0.55;
+            const pupilOffset = eyeSize * 0.25;
+            
+            ctx.beginPath();
+            ctx.arc(leftEye.x + Math.cos(angle)*pupilOffset, leftEye.y + Math.sin(angle)*pupilOffset, pupilSize, 0, Math.PI * 2);
+            ctx.arc(rightEye.x + Math.cos(angle)*pupilOffset, rightEye.y + Math.sin(angle)*pupilOffset, pupilSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 吐蛇信效果 (舌頭閃爍，當 ratio = 0)
+            const tongueCycle = Math.floor(globalAnimationTime * 2.5) % 2;
+            if (tongueCycle === 0) {
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                
+                const tx = wx + Math.cos(angle) * (radius * 1.3);
+                const ty = wy + Math.sin(angle) * (radius * 1.3);
+                
+                ctx.beginPath();
+                ctx.moveTo(wx + Math.cos(angle) * radius, wy + Math.sin(angle) * radius);
+                ctx.lineTo(tx, ty);
+                // 蛇信開叉
+                ctx.lineTo(tx + Math.cos(angle - 0.5) * 4, ty + Math.sin(angle - 0.5) * 4);
+                ctx.moveTo(tx, ty);
+                ctx.lineTo(tx + Math.cos(angle + 0.5) * 4, ty + Math.sin(angle + 0.5) * 4);
+                ctx.stroke();
+            }
+
+        } else {
+            // 蛇身：絢麗漸層霓虹綠 (動態 Hue 偏移，讓顏色在蛇身上像液體般流淌)
+            const hueShift = (globalAnimationTime * 15 - i * 10) % 360;
+            ctx.fillStyle = `hsl(${140 + Math.sin(hueShift * Math.PI / 180) * 20}, 85%, ${45 - ratio * 15}%)`;
+            
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = 'rgba(16, 185, 129, 0.2)';
+
+            ctx.beginPath();
+            ctx.arc(wx, wy, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    // 只要遊戲還在進行，就持續以瀏覽器最高流暢度進行幀渲染
+    if (isStarted && !isGameOver) {
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+// --- STREAMING_CHUNK: Handlers for game ending and restart... ---
+function endGame() {
+    isGameOver = true;
+    AudioEngine.playGameOver();
+
+    document.getElementById('final-score').textContent = score;
+    document.getElementById('final-high-score').textContent = highScore;
+
+    const overlay = document.getElementById('overlay');
+    document.getElementById('welcome-state').classList.add('hidden');
+    document.getElementById('gameover-state').classList.remove('hidden');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+}
+
+// 方向變更控制 (加上 180 反向保護)
+function changeDirection(targetDir) {
+    if (isGameOver || !isStarted) return;
+    if (targetDir.x === -direction.x && targetDir.y === -direction.y) return;
+    nextDirection = targetDir;
+    AudioEngine.playTick();
+}
+
+// --- STREAMING_CHUNK: Binding user input mechanisms (Keyboard + Gesture Swipe)... ---
+// 鍵盤操控綁定 (WASD & 方向鍵)
+document.addEventListener('keydown', (e) => {
+    switch(e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+            changeDirection({ x: 0, y: -1 });
+            break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+            changeDirection({ x: 0, y: 1 });
+            break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+            changeDirection({ x: -1, y: 0 });
+            break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+            changeDirection({ x: 1, y: 0 });
+            break;
+    }
+});
+
+// 手勢滑動 (Swipe) 感應
+let touchStartX = 0;
+let touchStartY = 0;
+canvas.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+canvas.addEventListener('touchend', (e) => {
+    const diffX = e.changedTouches[0].clientX - touchStartX;
+    const diffY = e.changedTouches[0].clientY - touchStartY;
+    
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+        if (Math.abs(diffX) > 30) {
+            if (diffX > 0) changeDirection({ x: 1, y: 0 }); // 右滑
+            else changeDirection({ x: -1, y: 0 });           // 左滑
+        }
+    } else {
+        if (Math.abs(diffY) > 30) {
+            if (diffY > 0) changeDirection({ x: 0, y: 1 });  // 下滑
+            else changeDirection({ x: 0, y: -1 });           // 上滑
+        }
+    }
+}, { passive: true });
+
+// 虛擬 D-pad 按鈕觸控
+document.getElementById('ctrl-up').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    changeDirection({ x: 0, y: -1 });
+});
+document.getElementById('ctrl-down').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    changeDirection({ x: 0, y: 1 });
+});
+document.getElementById('ctrl-left').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    changeDirection({ x: -1, y: 0 });
+});
+document.getElementById('ctrl-right').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    changeDirection({ x: 1, y: 0 });
+});
+
+// 開始按鈕
+document.getElementById('start-btn').addEventListener('click', () => {
+    AudioEngine.init();
+    isStarted = true;
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    initGame();
+    lastUpdateTime = performance.now();
+    requestAnimationFrame(gameLoop);
+});
+
+// 重玩按鈕
+document.getElementById('restart-btn').addEventListener('click', () => {
+    AudioEngine.init();
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    initGame();
+    lastUpdateTime = performance.now();
+    requestAnimationFrame(gameLoop);
+});
+
+// 首次加載渲染一幀靜態畫面做預覽
+initGame();
+requestAnimationFrame((timestamp) => {
+    // 預覽不啟動循環 update，僅單純渲染
+    globalAnimationTime = 0;
+    // 使用 t=1 靜態繪製
+    ctx.fillStyle = '#070a13';
+    ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+    drawPreview();
+});
+
+function drawPreview() {
+    // 簡單的繪製邏輯供未開始時的預覽
+    foods.forEach(food => {
+        const cx = food.x * cellSize + cellSize / 2;
+        const cy = food.y * cellSize + cellSize / 2;
+        const radius = cellSize * 0.44;
+        ctx.fillStyle = `hsl(${food.hue}, 95%, 50%)`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#05070f';
+        ctx.font = `black ${Math.floor(cellSize * 0.65)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(food.value, cx, cy);
+    });
+    
+    snake.forEach((part, i) => {
+        const cx = part.x * cellSize + cellSize / 2;
+        const cy = part.y * cellSize + cellSize / 2;
+        const radius = cellSize * (0.45 - (i / snake.length) * 0.18);
+        ctx.fillStyle = i === 0 ? '#10b981' : '#047857';
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+</script>
+</body>
+</html>
